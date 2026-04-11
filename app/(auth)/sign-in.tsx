@@ -3,6 +3,7 @@ import { useAuth, useSignIn } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
 import React, { useState } from 'react';
+import { usePostHog } from 'posthog-react-native';
 import {
     ActivityIndicator,
     Pressable,
@@ -18,6 +19,7 @@ export default function SignInScreen() {
     const { signIn, errors, fetchStatus } = useSignIn();
     const { isSignedIn } = useAuth();
     const router = useRouter();
+    const posthog = usePostHog();
 
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
@@ -50,6 +52,11 @@ export default function SignInScreen() {
                     return;
                 }
 
+                posthog.identify(emailAddress, {
+                    $set: { email: emailAddress },
+                });
+                posthog.capture('user_signed_in', { email: emailAddress });
+
                 void navigateHome({ decorateUrl });
             },
         });
@@ -69,6 +76,9 @@ export default function SignInScreen() {
         });
 
         if (error) {
+            posthog.capture('user_sign_in_failed', {
+                error_message: error.longMessage ?? error.message,
+            });
             setFlowError(error.longMessage ?? error.message ?? 'Unable to sign in.');
             return;
         }

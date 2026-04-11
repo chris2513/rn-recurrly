@@ -3,6 +3,7 @@ import { useAuth, useSignUp } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
 import React, { useState } from 'react';
+import { usePostHog } from 'posthog-react-native';
 import {
     ActivityIndicator,
     Pressable,
@@ -18,6 +19,7 @@ export default function SignUpScreen() {
     const { signUp, errors, fetchStatus } = useSignUp();
     const { isSignedIn } = useAuth();
     const router = useRouter();
+    const posthog = usePostHog();
 
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
@@ -50,6 +52,12 @@ export default function SignUpScreen() {
                     return;
                 }
 
+                posthog.identify(emailAddress, {
+                    $set: { email: emailAddress },
+                    $set_once: { signup_date: new Date().toISOString() },
+                });
+                posthog.capture('user_signed_up', { email: emailAddress });
+
                 void navigateHome({ decorateUrl });
             },
         });
@@ -69,6 +77,9 @@ export default function SignUpScreen() {
         });
 
         if (error) {
+            posthog.capture('user_sign_up_failed', {
+                error_message: error.longMessage ?? error.message,
+            });
             setFlowError(error.longMessage ?? error.message ?? 'Unable to create an account.');
             return;
         }
