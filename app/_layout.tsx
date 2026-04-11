@@ -8,11 +8,11 @@ import { useEffect } from "react";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
-// if (!publishableKey) {
-//   throw new Error(
-//     'Missing Clerk publishable key. Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file.'
-//   );
-// }
+if (!publishableKey) {
+  throw new Error(
+    'Missing Clerk publishable key. Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to your .env file.'
+  );
+}
 
 SplashScreen.preventAutoHideAsync();
 
