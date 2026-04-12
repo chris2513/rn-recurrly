@@ -40,7 +40,7 @@ basics/expo/
 │   │   └── storage.ts            # AsyncStorage wrapper
 │   └── styles/
 │       └── theme.ts              # Shared style constants
-├── app.json                      # Expo configuration
+├── app.config.js                 # Expo configuration
 ├── babel.config.js               # Babel config with React Compiler
 ├── eslint.config.js              # ESLint flat config
 ├── package.json                  # Dependencies
@@ -109,7 +109,7 @@ npx expo run:android
 
 ### Configuration
 
-PostHog is configured in `src/config/posthog.ts` using environment variables from `app.json`:
+PostHog is configured in `src/config/posthog.ts` using environment variables from `app.config.js`:
 
 ```typescript
 import Constants from 'expo-constants'
@@ -185,7 +185,7 @@ export function useAuth() {
 
 ### New Architecture
 
-Enabled in `app.json` for better performance:
+Enabled in `app.config.js` for better performance:
 
 ```json
 {

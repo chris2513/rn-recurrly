@@ -1,15 +1,21 @@
 import { View, Text } from 'react-native';
 import { useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
-import { usePostHog } from "posthog-react-native";
+import getPosthog from '../../src/utils/getPosthog';
 
 const SubscriptionDetails = () => {
     const { id } = useLocalSearchParams<{id: string}>();
-    const posthog = usePostHog();
-
     useEffect(() => {
-        posthog.capture('subscription_detail_viewed', { subscription_id: id });
-    }, [id, posthog]);
+        let mounted = true;
+        (async () => {
+            const ph = await getPosthog();
+            if (!mounted || !ph) return;
+            ph.capture('subscription_detail_viewed', { subscription_id: id });
+        })();
+        return () => {
+            mounted = false;
+        };
+    }, [id]);
 
     return (
         <View>

@@ -41,9 +41,26 @@ export default function RootLayout() {
   // Manual screen tracking for Expo Router
   useEffect(() => {
     if (previousPathname.current !== pathname) {
+      const allowedKeys = [
+        'utm_source',
+        'utm_medium',
+        'utm_campaign',
+        'utm_term',
+        'utm_content',
+        'ref',
+        'source',
+        'campaign',
+      ];
+
+      const filteredParams: Record<string, unknown> = {};
+      for (const key of allowedKeys) {
+        const value = params[key];
+        if (value !== undefined) filteredParams[key] = value;
+      }
+
       posthog.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
-        ...params,
+        ...filteredParams,
       });
       previousPathname.current = pathname;
     }

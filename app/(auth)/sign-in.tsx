@@ -3,7 +3,6 @@ import { useAuth, useSignIn } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
 import React, { useState } from 'react';
-import { usePostHog } from 'posthog-react-native';
 import {
     ActivityIndicator,
     Pressable,
@@ -11,6 +10,7 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import getPosthog from '../../src/utils/getPosthog';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -19,7 +19,8 @@ export default function SignInScreen() {
     const { signIn, errors, fetchStatus } = useSignIn();
     const { isSignedIn } = useAuth();
     const router = useRouter();
-    const posthog = usePostHog();
+
+    // Use shared lazy loader for PostHog client (avoids native view dup errors)
 
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
@@ -41,7 +42,7 @@ export default function SignInScreen() {
 
     const finalizeSignIn = async () => {
         await signIn.finalize({
-            navigate: ({
+            navigate: async ({
                 session,
                 decorateUrl,
             }: {
@@ -52,10 +53,11 @@ export default function SignInScreen() {
                     return;
                 }
 
-                posthog.identify(emailAddress, {
-                    $set: { email: emailAddress },
-                });
-                posthog.capture('user_signed_in', { email: emailAddress });
+                const ph = await getPosthog();
+                if (ph) {
+                    ph.identify(emailAddress, { $set: { email: emailAddress } });
+                    ph.capture('user_signed_in', { email: emailAddress });
+                }
 
                 void navigateHome({ decorateUrl });
             },
@@ -76,9 +78,12 @@ export default function SignInScreen() {
         });
 
         if (error) {
-            posthog.capture('user_sign_in_failed', {
-                error_message: error.longMessage ?? error.message,
-            });
+            const ph = await getPosthog();
+            if (ph) {
+                ph.capture('user_sign_in_failed', {
+                    error_message: error.longMessage ?? error.message,
+                });
+            }
             setFlowError(error.longMessage ?? error.message ?? 'Unable to sign in.');
             return;
         }

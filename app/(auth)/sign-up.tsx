@@ -2,8 +2,8 @@ import '@/global.css';
 import { useAuth, useSignUp } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
+import getPosthog from '../../src/utils/getPosthog';
 import React, { useState } from 'react';
-import { usePostHog } from 'posthog-react-native';
 import {
     ActivityIndicator,
     Pressable,
@@ -17,9 +17,8 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 export default function SignUpScreen() {
     const { signUp, errors, fetchStatus } = useSignUp();
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, userId } = useAuth();
     const router = useRouter();
-    const posthog = usePostHog();
 
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
@@ -41,7 +40,7 @@ export default function SignUpScreen() {
 
     const finalizeSignUp = async () => {
         await signUp.finalize({
-            navigate: ({
+            navigate: async ({
                 session,
                 decorateUrl,
             }: {
@@ -52,11 +51,17 @@ export default function SignUpScreen() {
                     return;
                 }
 
-                posthog.identify(emailAddress, {
-                    $set: { email: emailAddress },
-                    $set_once: { signup_date: new Date().toISOString() },
-                });
-                posthog.capture('user_signed_up', { email: emailAddress });
+                // Identify by non-PII distinct id (Clerk user id) and set low-cardinality properties only.
+                const ph = await getPosthog();
+                if (ph) {
+                    if (userId) {
+                        ph.identify(userId, {
+                            $set_once: { signup_date: new Date().toISOString() },
+                            $set: { signup_method: 'email' },
+                        });
+                    }
+                    ph.capture('user_signed_up', { signup_method: 'email' });
+                }
 
                 void navigateHome({ decorateUrl });
             },
@@ -77,9 +82,30 @@ export default function SignUpScreen() {
         });
 
         if (error) {
-            posthog.capture('user_sign_up_failed', {
-                error_message: error.longMessage ?? error.message,
-            });
+            // Map errors to structured, low-cardinality codes for analytics.
+            const mapSignUpError = (err: any) => {
+                const msg = (err?.longMessage ?? err?.message ?? '').toLowerCase();
+                if (msg.includes('password')) {
+                    return { code: 'INVALID_PASSWORD', message: 'Invalid password' } as const;
+                }
+                if (msg.includes('already') || msg.includes('duplicate') || (msg.includes('email') && msg.includes('exists'))) {
+                    return { code: 'DUPLICATE_EMAIL', message: 'Email already in use' } as const;
+                }
+                if (msg.includes('verification')) {
+                    return { code: 'VERIFICATION_FAILED', message: 'Verification failed' } as const;
+                }
+                return { code: 'UNKNOWN', message: 'Signup failed' } as const;
+            };
+
+            const mapped = mapSignUpError(error);
+            const ph = await getPosthog();
+            if (ph) {
+                ph.capture('user_sign_up_failed', {
+                    error_code: mapped.code,
+                    error_message: mapped.message,
+                });
+            }
+
             setFlowError(error.longMessage ?? error.message ?? 'Unable to create an account.');
             return;
         }
