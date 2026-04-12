@@ -10,10 +10,10 @@ import "@/global.css";
 import { formatCurrency } from "@/lib/utils";
 import dayjs from "dayjs";
 import { styled } from "nativewind";
-import getPosthog from '../../src/utils/getPosthog';
 import { useState } from "react";
 import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import getPosthog from '../../src/utils/getPosthog';
 const SafeAreaView = styled(RNSafeAreaView)
 
 export default function App() {

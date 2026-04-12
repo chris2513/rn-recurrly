@@ -1,10 +1,10 @@
 import '@/global.css';
 import { useClerk } from '@clerk/expo';
 import { styled } from 'nativewind';
-import getPosthog from '../../src/utils/getPosthog';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
+import getPosthog from '../../src/utils/getPosthog';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -19,7 +19,7 @@ export default function Settings() {
             const ph = await getPosthog();
             if (ph) {
                 ph.capture('user_signed_out');
-                await ph.flush();
+                await ph.flush().catch(() => undefined); // Ensure the event is sent before resetting
                 ph.reset();
             }
             await signOut();

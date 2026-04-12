@@ -2,7 +2,6 @@ import '@/global.css';
 import { useAuth, useSignUp } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
-import getPosthog from '../../src/utils/getPosthog';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -12,6 +11,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
+import getPosthog from '../../src/utils/getPosthog';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -98,12 +98,17 @@ export default function SignUpScreen() {
             };
 
             const mapped = mapSignUpError(error);
-            const ph = await getPosthog();
-            if (ph) {
-                ph.capture('user_sign_up_failed', {
-                    error_code: mapped.code,
-                    error_message: mapped.message,
-                });
+            try {
+                const ph = await getPosthog();
+                if (ph) {
+                    ph.capture('user_sign_up_failed', {
+                        error_code: mapped.code,
+                        error_message: mapped.message,
+                    });
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to capture sign up error analytics', err);
             }
 
             setFlowError(error.longMessage ?? error.message ?? 'Unable to create an account.');
