@@ -4,17 +4,21 @@ import { styled } from 'nativewind';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
+import { usePostHog } from 'posthog-react-native';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 export default function Settings() {
     const { signOut } = useClerk();
     const [signingOut, setSigningOut] = useState(false);
+    const posthog = usePostHog();
 
     const handleSignOut = async () => {
         if (signingOut) return;
         setSigningOut(true);
         try {
+            posthog.capture('user_signed_out');
+            posthog.reset();
             await signOut();
         } catch (err) {
             // Log the error and re-enable the button so the user can retry

@@ -1,25 +1,29 @@
-import "@/global.css"
-import { useState } from "react";
-import {View, Image, Text, FlatList} from "react-native";
-import {SafeAreaView as RNSafeAreaView} from "react-native-safe-area-context";
-import { styled } from "nativewind";
-import images from "@/constants/images";
-import {HOME_BALANCE, HOME_SUBSCRIPTIONS, HOME_USER, UPCOMING_SUBSCRIPTIONS} from "@/constants/data";
-import {icons} from "@/constants/icons";
-import {formatCurrency} from "@/lib/utils";
-import dayjs from "dayjs";
+import useSubscriptionsStore from "@/app/stores/useSubscriptionsStore";
+import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeadings";
-import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
 import SubscriptionCard from "@/components/SubscriptionCard";
+import UpcomingSubscriptionCard from "@/components/UpcomingSubscriptionCard";
+import { HOME_BALANCE, HOME_USER, UPCOMING_SUBSCRIPTIONS } from "@/constants/data";
+import { icons } from "@/constants/icons";
+import images from "@/constants/images";
+import "@/global.css";
+import { formatCurrency } from "@/lib/utils";
+import dayjs from "dayjs";
+import { styled } from "nativewind";
+import { usePostHog } from "posthog-react-native";
+import { useState } from "react";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
+import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 const SafeAreaView = styled(RNSafeAreaView)
 
 export default function App() {
     const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
+    const subscriptions = useSubscriptionsStore((s) => s.subscriptions);
+    const posthog = usePostHog();
     return (
         <SafeAreaView className="flex-1 bg-background p-5">
-
             <View>
-
                 <FlatList
                     ListHeaderComponent={() => (
                         <View>
@@ -28,7 +32,9 @@ export default function App() {
                                     <Image source={images.avatar} className="home-avatar" />
                                     <Text className="home-user-name">{HOME_USER.name}</Text>
                                 </View>
-                                <Image source={icons.add} className="home-add-icon" />
+                                <Pressable onPress={() => setModalVisible(true)}>
+                                    <Image source={icons.add} className="home-add-icon" />
+                                </Pressable>
                             </View>
                             <View className="home-balance-card">
 
@@ -46,7 +52,7 @@ export default function App() {
                             <FlatList
 
                                 data={UPCOMING_SUBSCRIPTIONS}
-                                renderItem={({item}) => (
+                                renderItem={({ item }) => (
                                     <UpcomingSubscriptionCard {...item} />
                                 )}
                                 keyExtractor={(item) => item.id}
@@ -57,15 +63,24 @@ export default function App() {
                             <ListHeading title="All Subscriptions" />
                         </View>
                     )}
-                    data={HOME_SUBSCRIPTIONS}
+                    data={subscriptions}
                     keyExtractor={(item) => item.id}
-                    renderItem={({item}) => (
+                    renderItem={({ item }) => (
                         <SubscriptionCard {...item}
-                            onPress={() => setExpandedSubscriptionId(
-                                (currentId) => (
-                                    currentId === item.id ? null : item.id
-                                )
-                            )}
+                            onPress={() => {
+                                const isExpanding = expandedSubscriptionId !== item.id;
+                                setExpandedSubscriptionId(
+                                    (currentId) => (
+                                        currentId === item.id ? null : item.id
+                                    )
+                                );
+                                if (isExpanding) {
+                                    posthog.capture('subscription_expanded', {
+                                        subscription_id: item.id,
+                                        subscription_name: item.name,
+                                    });
+                                }
+                            }}
                             expanded={expandedSubscriptionId === item.id}
                         />
                     )}
@@ -76,7 +91,12 @@ export default function App() {
                         No Subscriptions Yet
                     </Text>}
                     contentContainerClassName="pb-20"
-                    />
+                />
+
+                <CreateSubscriptionModal
+                    visible={modalVisible}
+                    onClose={() => setModalVisible(false)}
+                />
 
             </View>
         </SafeAreaView>
