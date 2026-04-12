@@ -3,7 +3,6 @@ import { useAuth, useSignIn } from '@clerk/expo';
 import { type Href, Link, useRouter } from 'expo-router';
 import { styled } from 'nativewind';
 import React, { useState } from 'react';
-import { usePostHog } from 'posthog-react-native';
 import {
     ActivityIndicator,
     Pressable,
@@ -12,14 +11,16 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
+import getPosthog from '../../src/utils/getPosthog';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 export default function SignInScreen() {
     const { signIn, errors, fetchStatus } = useSignIn();
-    const { isSignedIn } = useAuth();
+    const { isSignedIn, userId } = useAuth();
     const router = useRouter();
-    const posthog = usePostHog();
+
+    // Use shared lazy loader for PostHog client (avoids native view dup errors)
 
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
@@ -41,7 +42,7 @@ export default function SignInScreen() {
 
     const finalizeSignIn = async () => {
         await signIn.finalize({
-            navigate: ({
+            navigate: async ({
                 session,
                 decorateUrl,
             }: {
@@ -52,10 +53,13 @@ export default function SignInScreen() {
                     return;
                 }
 
-                posthog.identify(emailAddress, {
-                    $set: { email: emailAddress },
-                });
-                posthog.capture('user_signed_in', { email: emailAddress });
+                const ph = await getPosthog();
+                if (ph) {
+                    if (userId) {
+                        ph.identify(userId);
+                    }
+                    ph.capture('user_signed_in', { signup_method: 'email' });
+                }
 
                 void navigateHome({ decorateUrl });
             },
@@ -76,10 +80,39 @@ export default function SignInScreen() {
         });
 
         if (error) {
-            posthog.capture('user_sign_in_failed', {
-                error_message: error.longMessage ?? error.message,
-            });
+            // Map errors to structured, low-cardinality codes for analytics (reuse sign-up mapping)
+            const mapSignInError = (err: any) => {
+                const codeStr = (err?.code ?? '').toString().toLowerCase();
+                const msg = (err?.longMessage ?? err?.message ?? '').toLowerCase();
+                if (codeStr.includes('invalid_password') || msg.includes('password')) {
+                    return { code: 'INVALID_PASSWORD', message: 'Invalid password' } as const;
+                }
+                if (msg.includes('already') || msg.includes('duplicate') || (msg.includes('email') && msg.includes('exists'))) {
+                    return { code: 'DUPLICATE_EMAIL', message: 'Email already in use' } as const;
+                }
+                if (codeStr.includes('verification') || msg.includes('verification')) {
+                    return { code: 'VERIFICATION_FAILED', message: 'Verification failed' } as const;
+                }
+                return { code: 'UNKNOWN', message: 'Sign in failed' } as const;
+            };
+
+            const mapped = mapSignInError(error);
+
+            // Ensure UI feedback is set immediately so analytics cannot block it.
             setFlowError(error.longMessage ?? error.message ?? 'Unable to sign in.');
+
+            const ph = await getPosthog();
+            if (ph) {
+                try {
+                    ph.capture('user_sign_in_failed', {
+                        error_code: mapped.code,
+                        error_message: mapped.message,
+                    });
+                } catch (e) {
+                    // swallow analytics exceptions to avoid blocking UI
+                }
+            }
+
             return;
         }
 

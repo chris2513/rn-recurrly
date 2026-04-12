@@ -10,17 +10,16 @@ import "@/global.css";
 import { formatCurrency } from "@/lib/utils";
 import dayjs from "dayjs";
 import { styled } from "nativewind";
-import { usePostHog } from "posthog-react-native";
 import { useState } from "react";
 import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import getPosthog from '../../src/utils/getPosthog';
 const SafeAreaView = styled(RNSafeAreaView)
 
 export default function App() {
     const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const subscriptions = useSubscriptionsStore((s) => s.subscriptions);
-    const posthog = usePostHog();
     return (
         <SafeAreaView className="flex-1 bg-background p-5">
             <View>
@@ -67,7 +66,7 @@ export default function App() {
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
                         <SubscriptionCard {...item}
-                            onPress={() => {
+                            onPress={async () => {
                                 const isExpanding = expandedSubscriptionId !== item.id;
                                 setExpandedSubscriptionId(
                                     (currentId) => (
@@ -75,10 +74,13 @@ export default function App() {
                                     )
                                 );
                                 if (isExpanding) {
-                                    posthog.capture('subscription_expanded', {
-                                        subscription_id: item.id,
-                                        subscription_name: item.name,
-                                    });
+                                    const ph = await getPosthog();
+                                    if (ph) {
+                                        ph.capture('subscription_expanded', {
+                                            subscription_id: item.id,
+                                            subscription_name: item.name,
+                                        });
+                                    }
                                 }
                             }}
                             expanded={expandedSubscriptionId === item.id}
