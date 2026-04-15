@@ -1,6 +1,6 @@
 import useSubscriptionsStore from "@/app/stores/useSubscriptionsStore";
 import { icons } from "@/constants/icons";
-import { posthog } from "@/src/config/posthog";
+import getPosthog from "@/src/utils/getPosthog";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import React, { useState } from "react";
@@ -66,13 +66,26 @@ export default function CreateSubscriptionModal({ visible, onClose, onCreate }: 
         addSubscription(newSub);
         if (onCreate) onCreate(newSub);
 
-        posthog.capture('subscription_created', {
-            subscription_id: id,
-            subscription_name: newSub.name,
-            price: newSub.price,
-            billing: newSub.billing,
-            category: newSub.category || "Other",
-        });
+        getPosthog()
+            .then((client) => {
+                if (!client) return;
+                try {
+                    client.capture('subscription_created', {
+                        subscription_id: id,
+                        subscription_name: newSub.name,
+                        price: newSub.price,
+                        billing: newSub.billing,
+                        category: newSub.category || "Other",
+                        context: { source: 'CreateSubscriptionModal' },
+                    });
+                } catch (err) {
+
+                    console.error('PostHog capture failed', err);
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to initialize PostHog for capture', err);
+            });
 
         // reset
         setName("");
