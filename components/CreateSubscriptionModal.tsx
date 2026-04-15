@@ -1,5 +1,6 @@
 import useSubscriptionsStore from "@/app/stores/useSubscriptionsStore";
 import { icons } from "@/constants/icons";
+import { posthog } from "@/src/config/posthog";
 import clsx from "clsx";
 import dayjs from "dayjs";
 import React, { useState } from "react";
@@ -64,6 +65,14 @@ export default function CreateSubscriptionModal({ visible, onClose, onCreate }: 
 
         addSubscription(newSub);
         if (onCreate) onCreate(newSub);
+
+        posthog.capture('subscription_created', {
+            subscription_id: id,
+            subscription_name: newSub.name,
+            price: newSub.price,
+            billing: newSub.billing,
+            category: newSub.category || "Other",
+        });
 
         // reset
         setName("");

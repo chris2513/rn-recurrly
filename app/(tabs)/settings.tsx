@@ -19,14 +19,11 @@ export default function Settings() {
             const ph = await getPosthog();
             if (ph) {
                 ph.capture('user_signed_out');
-                await ph.flush().catch(() => undefined); // Ensure the event is sent before resetting
+                await ph.flush().catch(() => undefined);
                 ph.reset();
             }
             await signOut();
         } catch (err) {
-            // Log the error and re-enable the button so the user can retry
-            // (Runtime will surface this in Metro/Console)
-            // eslint-disable-next-line no-console
             console.error('Sign out failed', err);
             setSigningOut(false);
         }
@@ -36,7 +33,7 @@ export default function Settings() {
         <SafeAreaView className="flex-1 bg-background p-5">
             <Text className="text-2xl font-sans-bold text-primary mb-6">Settings</Text>
 
-            <View className="rounded-[24px] bg-card px-6 py-6 shadow-sm border border-black/10">
+            <View className="rounded-3xl bg-card px-6 py-6 shadow-sm border border-black/10">
                 <Text className="text-sm font-sans-semibold text-primary/70 mb-4">Account</Text>
 
                 <Pressable
